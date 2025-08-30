@@ -1,0 +1,28 @@
+Task 3.2 Edits
+
+All changes done to Task 3.1 plus the additional ones mentioned below
+---
+
+1. user/master.c
+	 - Edit:
+		 - New user program implementing the master process for the Task 3.2 maze/coordination problem.
+		 - Sets up shared memory and mailboxes, initializes the maze state, and forks two child processes (A and B) to solve the maze.
+		 - Waits for both processes to finish and prints the result (WIN/LOSS).
+	 - Usage:
+		 - To run: master <length> <startA> <startB>
+			 (where <length> is the maze length, <startA> and <startB> are the starting positions for A and B)
+
+2. user/process.c
+	 - Edit:
+		 - New user program implementing the logic for each process (A or B) in the maze.
+		 - Each process receives its role and shared memory/mailbox keys as arguments, interacts with the shared memory and mailboxes to coordinate movement, and updates completion status.
+	 - Usage:
+		 - This program is invoked by master and not run directly by the user.
+
+3. user/ulib.c
+	 - Edit:
+		 - added itoa10() for converting integers to strings used in user/master.c
+
+4. Makefile
+	 - Edit:
+		 - Added _master and _process to the UPROGS list to ensure the new user programs are built and included.

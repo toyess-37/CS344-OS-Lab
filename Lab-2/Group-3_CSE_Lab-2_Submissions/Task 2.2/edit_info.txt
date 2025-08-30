@@ -1,0 +1,108 @@
+Task 2.2 - Lottery Scheduling (settickets/gettickets)
+
+Summary
+-------
+This document lists all edits made to xv6 to implement Task 2.1.
+
+Findings (ordered by file)
+-----------------------------------
+(1) kernel/proc.c
+		Location: allocproc(), fork(), scheduler() and top-of-file additions
+
+		- Top-of-file: pseudo-random generator added for lottery selection
+
+		    Adds a simple 64-bit linear congruential generator (LCG) used to implement randomness for the lottery scheduler. Behavioral effect: provides deterministic-but-appearing-random selection across runs for fairness testing; seed is fixed in code.
+
+		- In allocproc():
+				p->tickets = 10; // Task 2.2
+
+			New processes are initialized with 10 tickets by default.
+		- In fork():
+				// Task 2.2
+				np->tickets = p->tickets;
+
+			Child inherits parent's number of tickets.
+
+		- In scheduler(): replacement scheduler loop implements lottery selection
+				- Sums up `total` = sum of tickets across RUNNABLE processes.
+				- Picks `winner = rand32() % total`.
+				- Iterates processes and selects the one whose ticket range contains `winner` (using prefix sums).
+
+			Implements lottery scheduling where each process's chance of being chosen is proportional to its `tickets` value. Behavioral effect: probabilistic fairness; processes with more tickets run more often on average.
+
+(2) kernel/proc.h
+		Location: struct proc definition
+
+		- Added field:
+				// for Task 2.2 --- lottery scheduling
+				int tickets;                // Number of tickets for lottery scheduling
+
+			Adds per-process ticket count tracked by the kernel.
+
+(3) kernel/syscall.h
+		Location: syscall number definitions
+
+		- Added:
+				// Task 2.2
+				#define SYS_settickets 22
+				#define SYS_gettickets 23
+
+			Adds syscall numbers for settickets and gettickets.
+
+(4) kernel/syscall.c
+		Location: syscall dispatcher and externs
+
+		- Declares and maps:
+				// Task 2.2
+				extern uint64 sys_settickets(void);
+				extern uint64 sys_gettickets(void);
+				...
+				[SYS_settickets] sys_settickets,
+				[SYS_gettickets] sys_gettickets,
+
+			Hooks the new syscall handlers into the syscall table, enabling userland to invoke them.
+
+(5) kernel/sysproc.c
+		Location: implementations of sys_settickets and sys_gettickets
+
+		- sys_settickets:
+				// Task 2.2
+				uint64
+				sys_settickets(void) 
+				{
+					int n;
+					argint(0, &n);
+					if(n < 1) return -1;
+
+					struct proc *p = myproc();
+					acquire(&p->lock);
+					p->tickets = n;
+					release(&p->lock);
+					return 0;
+				}
+
+			Validates that provided ticket count is >= 1 and updates the calling process's tickets under lock.
+
+		- sys_gettickets:
+				uint64
+				sys_gettickets(void)
+				{
+					struct proc* p = myproc();
+					return (uint64)p->tickets;
+				}
+
+			Returns the calling process's ticket count.
+
+(6) user/task2.2Demo.c
+		Location: user demo program
+
+		- Provides `fork_lottery_child(label, tickets, dur)` that forks a child, calls `settickets(tickets)`, runs CPU-bound work for a duration, counts iterations, prints results, and exits.
+		- main() launches two children with different ticket counts to demonstrate proportional CPU share.
+
+		    Demonstrates lottery behavior: child with more tickets should complete more work iterations in the same real time.
+
+(7) user/user.h and user/usys.pl
+		- `user.h` adds prototypes: `int settickets(int); int gettickets(void);`
+		- `usys.pl` adds stubs for `settickets` and `gettickets` so user programs can call the syscalls.
+
+(8) Makefile/UPROGS: Add _task2.2Demo to UPROGS

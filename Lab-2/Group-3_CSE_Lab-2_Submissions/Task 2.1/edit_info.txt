@@ -1,0 +1,130 @@
+Task 2.1 - Weighted Round Robin Scheduling
+
+Summary
+-------
+This document lists all edits made to xv6 to implement Task 2.1.
+
+Findings (ordered by file)
+-----------------------------------
+(1) kernel/proc.c
+	Location: allocproc(), fork() (multiple locations contain Task 2.1 comments)
+
+		- In allocproc():
+			// Task 2.1
+			p->priority = DEFAULT_PRIORITY;
+			p->ticks = 0;
+
+		- In fork():
+			// Task 2.1
+			np->priority = p->priority;
+			np->ticks = 0;
+
+			Child inherits parent's priority; tick counter reset for the child.
+
+(2) kernel/proc.h
+	Location: struct proc definition --- added the following fields
+
+		// for Task 2.1
+		int priority;               // Process priority
+		int ticks;                 // Ticks used by the process
+
+(3) kernel/syscall.h
+	Location: syscall number definitions
+	
+		// Task 2.1
+		#define SYS_setpriority 22
+		#define SYS_getpriority 23
+
+		New syscall numbers were added for `setpriority` and `getpriority`.
+
+(4) kernel/syscall.c
+	Location: syscall table and externs
+	Snippet & explanation:
+		// Task 2.1
+		extern uint64 sys_setpriority(void);
+		extern uint64 sys_getpriority(void);
+		...
+		// Task 2.1
+		[SYS_setpriority] sys_setpriority,
+		[SYS_getpriority] sys_getpriority,
+
+		Declarations and mapping of the syscall numbers to handler functions.
+
+(5) kernel/sysproc.c
+	Location: implementations of sys_setpriority and sys_getpriority
+
+		// Task 2.1
+		uint64
+		sys_setpriority(void) 
+		{
+			int n;
+			argint(0, &n);
+			if(n < 1 || n > MAX_PRIORITY) return -1;
+
+			struct proc *p = myproc();
+			acquire(&p->lock);
+			p->priority = n;
+			// reset ticks so change takes effect promptly
+			p->ticks = 0;
+			release(&p->lock);
+			return 0;
+		}
+
+		uint64
+		sys_getpriority(void) 
+		{
+			struct proc *p = myproc();
+			int ret;
+			acquire(&p->lock);
+			ret = p->priority;
+			release(&p->lock);
+			return ret;
+		}
+
+(6) kernel/trap.c
+	Location: usertrap() and kerneltrap() timer handling
+	(usertrap section):
+		// Task 2.1
+		struct proc *p = myproc();
+		if(p && p->state == RUNNING){
+			p->ticks++;
+
+			// Preempt only when quantum is consumed.
+			if(p->ticks >= p->priority){
+				p->ticks = 0;
+				yield();          // give CPU to next runnable
+			}
+		}
+		else{
+			yield();
+		}
+
+	(kerneltrap section):
+		// Task 2.1
+		if(p->state == RUNNING){
+			p->ticks++;
+
+			// Preempt only when quantum is consumed.
+			if(p->ticks >= p->priority){
+				p->ticks = 0;
+				yield();          // give CPU to next runnable
+			}
+		}
+		else{
+			yield();
+		}
+
+(7) user/task2.1Demo.c
+	Location: new demo program in user section
+	Snippet & explanation:
+		- A helper `priority_fork(int priority, char label)` forks a child, 
+          sets child's priority via `setpriority`, 
+          does a long loop printing the label periodically, then exits.
+		- main() forks three children with priorities 500 (A), 1 (B), and 100 (C), waits for them and exits.
+
+(8) user/user.h and user/usys.pl
+	Snippet & explanation:
+		- `user.h` adds prototypes: `int setpriority(int); int getpriority(void);`
+		- `usys.pl` adds stubs for `setpriority` and `getpriority` so user programs can call the syscalls (it emits li a7, SYS_setpriority; ecall; ret style stubs).
+
+(9) Makefile/UPROGS: Add _task2.1Demo to UPROGS

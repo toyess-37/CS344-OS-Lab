@@ -1,0 +1,75 @@
+
+Task 3.1 Edits
+
+---
+
+1. kernel/main.c
+	 - Edit:
+		 - Added extern void shminit(void); and extern void mboxinit(void); after the includes.
+		 - In the main() function, after initializing the first user process, added calls to shminit(); and mboxinit();
+	 - Purpose:
+		 - Initializes the shared memory and mailbox subsystems at kernel startup, as required for Task 3.1.
+
+2. kernel/defs.h
+	 - Edit:
+		 - Added prototypes for shared memory and mailbox functions:
+			 - shminit, shm_create, shm_get, shm_close, shm_cleanup
+			 - mboxinit, mbox_create, mbox_send, mbox_recv, mbox_close
+	 - Purpose:
+		 - Exposes the new shared memory and mailbox kernel functions to other kernel modules.
+
+3. kernel/proc.c
+	 - Edit:
+		 - In freeproc(struct proc *p), before freeing the process page table, added a call to shm_cleanup(p);
+	 - Purpose:
+		 - Ensures that all shared memory segments associated with a process are cleaned up when the process exits, preventing resource leaks.
+
+4. kernel/syscall.h
+	 - Edit:
+		 - Added syscall numbers for the new shared memory and mailbox system calls:
+			 - SYS_shm_create, SYS_shm_get, SYS_shm_close
+			 - SYS_mbox_create, SYS_mbox_send, SYS_mbox_recv, SYS_mbox_close
+	 - Purpose:
+		 - Assigns unique syscall numbers for the new system calls, enabling user programs to invoke them.
+
+5. kernel/syscall.c
+	 - Edit:
+		 - Declared the new syscall handler functions: sys_shm_create, sys_shm_get, sys_shm_close, sys_mbox_create, sys_mbox_send, sys_mbox_recv, sys_mbox_close.
+		 - Added these handlers to the syscall dispatch table, mapping them to their respective syscall numbers.
+	 - Purpose:
+		 - Integrates the new system calls into the kernel's syscall mechanism.
+
+6. kernel/sysproc.c
+	 - Edit:
+		 - Implemented the syscall handler functions for shared memory:
+			 - sys_shm_create, sys_shm_get, sys_shm_close
+	 - Purpose:
+		 - Provides the kernel-side implementation for the shared memory system calls.
+
+7. user/usys.pl
+	 - Edit:
+		 - Added entries for the new system calls:
+			 - shm_create, shm_get, shm_close
+			 - mbox_create, mbox_send, mbox_recv, mbox_close
+	 - Purpose:
+		 - Ensures that user-level stubs for the new system calls are generated.
+
+8. user/user.h
+	 - Edit:
+		 - Added prototypes for the new user-level system call wrappers:
+			 - shm_create, shm_get, shm_close
+			 - mbox_create, mbox_send, mbox_recv, mbox_close
+	 - Purpose:
+		 - Allows user programs to call the new system calls.
+
+9. user/shmtest.c and user/mboxtest.c are new user programs for testing.
+	 - Usage:
+		 - To run shmtest, simply type: shmtest
+			 (Expected output: hello)
+		 - To run mboxtest, type: mboxtest <int a> <int b>
+			 (where <int a> and <int b> are integer arguments required by the program)
+
+10. Makefile
+	 - Edit:
+         - Added shm.o and mbox.o to the list of kernel programs
+		 - Added _shmtest and _mboxtest to the UPROGS list to ensure the new user programs are built and included.
