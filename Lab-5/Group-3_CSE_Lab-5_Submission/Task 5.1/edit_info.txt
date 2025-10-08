@@ -1,0 +1,36 @@
+
+Edits for Task 5.1
+==================
+This file summarizes the code edits made to xv6 for Task 5.1: Large files.
+
+Summary of edits
+----------------
+
+1. Makefile
+ - added $U/_bigfile
+
+2. user/bigfile.c
+ - added test file to test large file; it allocates 3000 blocks and then checks the values at those 3000 blocks
+
+3. kernel/param.h
+ - Location: `#define FSSIZE` macro
+ - What changed: `FSSIZE` has been increased to `200000` blocks (from an earlier value of 2000)
+
+4. kernel/file.h
+ - Location: struct `inode` declaration (an array `addrs` declaration)
+ - What changed: The `addrs` array size is now `NDIRECT+2` (one for NINDIRECT and the other for NDOUBLY_INDIRECT)
+
+5. kernel/fs.h
+ - Location: definitions near the top of the file-system header
+ - What changed:
+	 * NDIRECT reduced from 12 to 11.
+	 * NDOUBLY_INDIRECT is introduced and defined as `NINDIRECT * NINDIRECT`.
+     * MAXFILE became (NDIRECT + NINDIRECT + NDOUBLY_INDIRECT) from (NDIRECT + NINDIRECT)
+
+6. kernel/fs.c
+ - What changed:
+	 * bmap(): The function was extended with logic to map an offset (bn) into a doubly-indirect region when bn exceeds NDIRECT + NINDIRECT. The code allocates and navigates a two-level indirect structure:
+		 - Ensure the doubly-indirect block (stored at ip->addrs[NDIRECT+1]) exists.
+		 - Read the outer (first-level) indirect block, index into it using outer_index = bn / NINDIRECT to get the address of an inner indirect block (allocate if needed).
+		 - Read the inner indirect block (address `addr`) and index into it using inner_index = bn % NINDIRECT to get the final data block (allocate if needed).
+	 * itrunc(): When truncating a file, the implementation now releases blocks allocated through the doubly-indirect pointer. It iterates the outer indirect block entries, for each non-zero entry reads the inner indirect block and frees all non-zero data block addresses found there, then frees the inner indirect block itself, and finally frees the outer doubly-indirect block.

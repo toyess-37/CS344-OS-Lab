@@ -1,0 +1,39 @@
+
+Edits for Task 5.2
+==================
+This file summarizes the code edits made to xv6 for Task 5.2: Symbolic links.
+
+
+Summary of edits
+----------------
+
+1. Makefile
+ - added $U/_symlinktest
+
+2. user/usys.pl
+ - Added `entry("symlink");`
+
+3. user/user.h
+ - Added `int symlink(const char *target, const char *path);
+
+4. kernel/stat.h
+ - Added `#define T_SYMLINK 4`
+
+5. kernel/fcntl.h
+ - Define `#define O_NOFOLLOW 0x800`
+
+6. kernel/syscall.h and kernel/syscall.c
+ - Markers:
+	 * `#define SYS_symlink 22` in kernel/syscall.h
+	 * `extern uint64 sys_symlink(void);` added to the syscall prototypes in kernel/syscall.c and mapped in the `syscalls[]` table.
+
+7. kernel/sysfile.c
+ - Key changes and locations:
+	 * In `create()` function: when a path already exists, the code previously checked for certain types; we now add T_SYMLINK recognition to allow creation/return of symlink inodes in some cases.
+	 * New syscall handler implementation `sys_symlink(void)` added in kernel/sysfile.c:
+		 - Allocates a new inode with type `T_SYMLINK` at the specified path using `create(path, T_SYMLINK, 0, 0)`.
+		 - Writes the target string into the symlink's data blocks via `writei(ip, 0, (uint64)target, 0, len + 1)` so that the link target is stored as the content of the symlink file (null-terminated string).
+	 * `sys_open()` updated to handle `T_SYMLINK` when following symlinks:
+		 - If the inode is a symlink and the open flags do not include `O_NOFOLLOW`, the code now attempts to follow the symlink by reading its content (the path string stored in the symlink inode) and resolving that path with `namei(path)`. It repeats up to a depth limit (`count < 10`) to prevent cycles and detects cycles (returns error after depth limit).
+		 - If `O_NOFOLLOW` is present and the inode is `T_SYMLINK`, `open()` should return a file descriptor for the symlink itself. (Note: the code in this edit path uses `readi` on the symlink to read its target when following; but when `O_NOFOLLOW` is set the code does not follow and leaves ip pointing to T_SYMLINK so subsequent open semantics read the symlink contents directly.)
+ - Intent: Add symlink creation (`symlink`) and symlink resolution behavior in `open()` with optional non-following via `O_NOFOLLOW`.
